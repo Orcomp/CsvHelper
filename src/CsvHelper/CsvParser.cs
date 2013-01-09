@@ -62,8 +62,6 @@ namespace CsvHelper
 
 		/// <summary>
 		/// Gets the raw row for the current record that was parsed.
-		/// For this to be populated, you need to turn on
-		/// <see cref="CsvConfiguration.CaptureRawRow"/>
 		/// </summary>
 		public virtual string RawRecord { get; private set; }
 
