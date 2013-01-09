@@ -236,7 +236,7 @@ namespace CsvHelper
 			while( true )
 			{
 				cPrev = c;
-				c = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition );
+				c = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, readerBufferPosition - fieldStartPosition );
 				if( c == '\0' )
 				{
 					return record;
@@ -347,14 +347,15 @@ namespace CsvHelper
 				}
 				else if( c == '\r' || c == '\n' )
 				{
-					if( cPrev == '\r' && c == '\n' )
+					var fieldLength = readerBufferPosition - fieldStartPosition - 1;
+					if( c == '\r' )
 					{
-						// We are still on the same line.
-
-						UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-
-						fieldStartPosition = readerBufferPosition;
-						continue;
+						var cNext = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, fieldLength );
+						if( cNext == '\n' )
+						{
+							readerBufferPosition++;
+							CharPosition++;
+						}
 					}
 
 					if( cPrev == '\0' || cPrev == '\r' || cPrev == '\n' || inComment )
@@ -371,7 +372,7 @@ namespace CsvHelper
 
 					// If we hit the end of the record, add 
 					// the current field and return the record.
-					AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition - 1 );
+					AppendField( ref field, fieldStartPosition, fieldLength );
 					// Include the \r or \n in the byte count.
 					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
 					AddFieldToRecord( ref recordPosition, field );
@@ -386,7 +387,7 @@ namespace CsvHelper
 			return record;
 		}
 
-		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition )
+		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition, int fieldLength )
 		{
 			if( readerBufferPosition == charsRead )
 			{
@@ -396,7 +397,7 @@ namespace CsvHelper
 				{
 					// The buffer ran out. Take the current
 					// text and add it to the field.
-					AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition );
+					AppendField( ref field, fieldStartPosition, fieldLength );
 					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
 				}
 
