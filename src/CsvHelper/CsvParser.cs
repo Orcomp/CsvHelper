@@ -350,11 +350,23 @@ namespace CsvHelper
 					var fieldLength = readerBufferPosition - fieldStartPosition - 1;
 					if( c == '\r' )
 					{
-						var cNext = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, fieldLength );
+						var cNext = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, fieldLength, true );
 						if( cNext == '\n' )
 						{
 							readerBufferPosition++;
 							CharPosition++;
+						}
+						else if( cNext == '\0' && cPrev != '\0' )
+						{
+							// cNext = \0: Handle \r as the line ending at the EOF.
+							// cPrev != \0: Let it go if the file only contains a \r.
+
+							// The readerBufferPosition and fieldStartPosition have been reset because
+							// of the GetChar call to check the next char. This means AppendField and
+							// UpdateBytePosition have already been called in GetChar, so we just
+							// need to call AddFieldToRecord.
+							AddFieldToRecord( ref recordPosition, field );
+							break;
 						}
 					}
 
@@ -387,7 +399,7 @@ namespace CsvHelper
 			return record;
 		}
 
-		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition, int fieldLength )
+		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition, int fieldLength, bool isPeek = false )
 		{
 			if( readerBufferPosition == charsRead )
 			{
@@ -408,6 +420,13 @@ namespace CsvHelper
 				if( charsRead == 0 )
 				{
 					// The end of the stream has been reached.
+
+					if( isPeek )
+					{
+						// Don't do any record handling because we're just looking ahead
+						// and not actually getting the next char to use.
+						return '\0';
+					}
 
 					if( c != '\r' && c != '\n' && c != '\0' )
 					{

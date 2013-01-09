@@ -233,17 +233,17 @@ namespace CsvHelper.Tests
 		[TestMethod]
 		public void ParseCrLnOnlyTest()
 		{
-			using (var stream = new MemoryStream())
-			using (var reader = new StreamReader(stream))
-			using (var writer = new StreamWriter(stream))
-			using (var parser = new CsvParser(reader))
+			using( var stream = new MemoryStream() )
+			using( var reader = new StreamReader( stream ) )
+			using( var writer = new StreamWriter( stream ) )
+			using( var parser = new CsvParser( reader ) )
 			{
-				writer.Write("\r\n");
+				writer.Write( "\r\n" );
 				writer.Flush();
 				stream.Position = 0;
 
 				var record = parser.Read();
-				Assert.IsNull(record);
+				Assert.IsNull( record );
 			}
 		}
 
