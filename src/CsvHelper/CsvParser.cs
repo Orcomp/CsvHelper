@@ -61,6 +61,13 @@ namespace CsvHelper
 		public virtual int Row { get { return currentRow; } }
 
 		/// <summary>
+		/// Gets the raw row for the current record that was parsed.
+		/// For this to be populated, you need to turn on
+		/// <see cref="CsvConfiguration.CaptureRawRow"/>
+		/// </summary>
+		public virtual string RawRecord { get; private set; }
+
+		/// <summary>
 		/// Creates a new parser using the given <see cref="StreamReader" />.
 		/// </summary>
 		/// <param name="reader">The <see cref="StreamReader" /> with the CSV file data.</param>
@@ -223,30 +230,32 @@ namespace CsvHelper
 		{
 			string field = null;
 			var fieldStartPosition = readerBufferPosition;
+			var rawFieldStartPosition = readerBufferPosition;
 			var inQuotes = false;
 			var fieldIsEscaped = false;
 			var inComment = false;
-			var inDelimeter = false;
-			var delimeterPosition = 0;
-			var prevCharWasDelimeter = false;
+			var inDelimiter = false;
+			var delimiterPosition = 0;
+			var prevCharWasDelimiter = false;
 			var recordPosition = 0;
 			record = new string[FieldCount];
+			RawRecord = string.Empty;
 			currentRow++;
 
 			while( true )
 			{
 				cPrev = c;
-				c = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, readerBufferPosition - fieldStartPosition );
+				c = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, readerBufferPosition - fieldStartPosition );
 				if( c == '\0' )
 				{
-					return record;
+					break;
 				}
 				readerBufferPosition++;
 				CharPosition++;
 
 				if( c == configuration.Quote )
 				{
-					if( !fieldIsEscaped && ( prevCharWasDelimeter || cPrev == '\r' || cPrev == '\n' || cPrev == '\0' ) )
+					if( !fieldIsEscaped && ( prevCharWasDelimiter || cPrev == '\r' || cPrev == '\n' || cPrev == '\0' ) )
 					{
 						// The field is escaped only if the first char of
 						// the field is a quote.
@@ -290,7 +299,7 @@ namespace CsvHelper
 					continue;
 				}
 
-				prevCharWasDelimeter = false;
+				prevCharWasDelimiter = false;
 
 				if( fieldIsEscaped && inQuotes )
 				{
@@ -312,9 +321,9 @@ namespace CsvHelper
 					// We are on a commented line.
 					// Ignore the character.
 				}
-				else if( c == configuration.Delimiter[0] || inDelimeter )
+				else if( c == configuration.Delimiter[0] || inDelimiter )
 				{
-					if( !inDelimeter )
+					if( !inDelimiter )
 					{
 						// If we hit the delimiter, we are
 						// done reading the field and can
@@ -326,23 +335,23 @@ namespace CsvHelper
 						fieldStartPosition = readerBufferPosition;
 						field = null;
 
-						inDelimeter = true;
+						inDelimiter = true;
 					}
 					
-					if( delimeterPosition == configuration.Delimiter.Length - 1 )
+					if( delimiterPosition == configuration.Delimiter.Length - 1 )
 					{
 						// We are done reading the delimeter.
 
 						// Include the delimiter in the byte count.
 						UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-						inDelimeter = false;
-						prevCharWasDelimeter = true;
-						delimeterPosition = 0;
+						inDelimiter = false;
+						prevCharWasDelimiter = true;
+						delimiterPosition = 0;
 						fieldStartPosition = readerBufferPosition;
 					}
 					else
 					{
-						delimeterPosition++;
+						delimiterPosition++;
 					}
 				}
 				else if( c == '\r' || c == '\n' )
@@ -350,7 +359,7 @@ namespace CsvHelper
 					var fieldLength = readerBufferPosition - fieldStartPosition - 1;
 					if( c == '\r' )
 					{
-						var cNext = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition, fieldLength, true );
+						var cNext = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, fieldLength, true );
 						if( cNext == '\n' )
 						{
 							readerBufferPosition++;
@@ -396,10 +405,28 @@ namespace CsvHelper
 				}
 			}
 
+			if( record != null )
+			{
+				RawRecord += new string( readerBuffer, rawFieldStartPosition, readerBufferPosition - rawFieldStartPosition );
+			}
+
 			return record;
 		}
 
-		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition, int fieldLength, bool isPeek = false )
+		/// <summary>
+		/// Gets the current character from the buffer while
+		/// advancing the buffer if it ran out.
+		/// </summary>
+		/// <param name="fieldStartPosition">The start position of the current field.</param>
+		/// <param name="rawFieldStartPosition">The start position of the raw field.</param>
+		/// <param name="field">The field.</param>
+		/// <param name="prevCharWasDelimiter">A value indicating if the previous char read was a delimiter.</param>
+		/// <param name="recordPosition">The position in the record we are currently at.</param>
+		/// <param name="fieldLength">The length of the field in the buffer.</param>
+		/// <param name="isPeek">A value indicating if this call is a peek. If true and the end of the record was found
+		/// no record handling will be done.</param>
+		/// <returns>The current character in the buffer.</returns>
+		protected char GetChar( ref int fieldStartPosition, ref int rawFieldStartPosition, ref string field, bool prevCharWasDelimiter, ref int recordPosition, int fieldLength, bool isPeek = false )
 		{
 			if( readerBufferPosition == charsRead )
 			{
@@ -411,11 +438,14 @@ namespace CsvHelper
 					// text and add it to the field.
 					AppendField( ref field, fieldStartPosition, fieldLength );
 					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
+
+					RawRecord += new string( readerBuffer, rawFieldStartPosition, readerBufferPosition - rawFieldStartPosition );
 				}
 
 				charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
 				readerBufferPosition = 0;
 				fieldStartPosition = 0;
+				rawFieldStartPosition = 0;
 
 				if( charsRead == 0 )
 				{
@@ -430,7 +460,7 @@ namespace CsvHelper
 
 					if( c != '\r' && c != '\n' && c != '\0' )
 					{
-						if( prevCharWasDelimeter )
+						if( prevCharWasDelimiter )
 						{
 							// Handle an empty field at the end of the row.
 							field = "";
@@ -440,6 +470,7 @@ namespace CsvHelper
 					}
 					else
 					{
+						RawRecord = null;
 						record = null;
 					}
 
