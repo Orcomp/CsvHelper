@@ -235,52 +235,12 @@ namespace CsvHelper
 
 			while( true )
 			{
-				if( readerBufferPosition == charsRead )
+				cPrev = c;
+				c = GetChar( ref fieldStartPosition, ref field, prevCharWasDelimeter, ref recordPosition );
+				if( c == '\0' )
 				{
-					// We need to read more of the stream.
-
-					if( fieldStartPosition != readerBufferPosition )
-					{
-						// The buffer ran out. Take the current
-						// text and add it to the field.
-						AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition );
-						UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-					}
-
-					charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
-					readerBufferPosition = 0;
-					fieldStartPosition = 0;
-
-					if( charsRead == 0 )
-					{
-						// The end of the stream has been reached.
-
-						if( c != '\r' && c != '\n' && c != '\0' )
-						{
-							if( prevCharWasDelimeter )
-							{
-								// Handle an empty field at the end of the row.
-								field = "";
-							}
-
-							// Make sure the next time through that we don't end up here again.
-							c = '\0';
-							
-							AddFieldToRecord( ref recordPosition, field );
-
-							return record;
-						}
-
-						return null;
-					}
+					return record;
 				}
-
-				if( c != '\0' )
-				{
-					cPrev = c;
-				}
-
-				c = readerBuffer[readerBufferPosition];
 				readerBufferPosition++;
 				CharPosition++;
 
@@ -424,6 +384,50 @@ namespace CsvHelper
 			}
 
 			return record;
+		}
+
+		private char GetChar( ref int fieldStartPosition, ref string field, bool prevCharWasDelimeter, ref int recordPosition )
+		{
+			if( readerBufferPosition == charsRead )
+			{
+				// We need to read more of the stream.
+
+				if( fieldStartPosition != readerBufferPosition )
+				{
+					// The buffer ran out. Take the current
+					// text and add it to the field.
+					AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition );
+					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
+				}
+
+				charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
+				readerBufferPosition = 0;
+				fieldStartPosition = 0;
+
+				if( charsRead == 0 )
+				{
+					// The end of the stream has been reached.
+
+					if( c != '\r' && c != '\n' && c != '\0' )
+					{
+						if( prevCharWasDelimeter )
+						{
+							// Handle an empty field at the end of the row.
+							field = "";
+						}
+
+						AddFieldToRecord( ref recordPosition, field );
+					}
+					else
+					{
+						record = null;
+					}
+
+					return '\0';
+				}
+			}
+
+			return readerBuffer[readerBufferPosition];
 		}
 	}
 }
