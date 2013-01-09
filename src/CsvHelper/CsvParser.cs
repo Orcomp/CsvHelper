@@ -31,6 +31,7 @@ namespace CsvHelper
 		private readonly CsvConfiguration configuration;
 		private char cPrev = '\0';
 		private char c = '\0';
+		private bool doneParsing;
 
 		/// <summary>
 		/// Gets the configuration.
@@ -97,6 +98,11 @@ namespace CsvHelper
 		public virtual string[] Read()
 		{
 			CheckDisposed();
+
+			if( doneParsing )
+			{
+				return null;
+			}
 
 			try
 			{
@@ -235,76 +241,13 @@ namespace CsvHelper
 
 			while( true )
 			{
-				//if( readerBufferPosition == charsRead )
-				//{
-				//	// We need to read more of the stream.
-
-				//	if( fieldStartPosition != readerBufferPosition )
-				//	{
-				//		// The buffer ran out. Take the current
-				//		// text and add it to the field.
-				//		AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition );
-				//		UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-				//	}
-
-				//	charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
-				//	readerBufferPosition = 0;
-				//	fieldStartPosition = 0;
-
-				//	if( charsRead == 0 )
-				//	{
-				//		// The end of the stream has been reached.
-
-				//		if( c != '\r' && c != '\n' && c != '\0' )
-				//		{
-				//			if( prevCharWasDelimeter )
-				//			{
-				//				// Handle an empty field at the end of the row.
-				//				field = "";
-				//			}
-
-				//			// Make sure the next time through that we don't end up here again.
-				//			c = '\0';
-							
-				//			AddFieldToRecord( ref recordPosition, field );
-
-				//			return record;
-				//		}
-
-				//		return null;
-				//	}
-				//}
-
 				cPrev = c;
-				//c = readerBuffer[readerBufferPosition];
-
-				c = GetChar( ref fieldStartPosition, ref field );
+				c = GetChar( ref fieldStartPosition, ref field, ref recordPosition );
 
 				if( c == '\0' )
 				{
-					// The end of the stream has been reached.
-
-					if( c != '\r' && c != '\n' )
-					{
-						if( prevCharWasDelimeter )
-						{
-							// Handle an empty field at the end of the row.
-							field = "";
-						}
-
-						// Make sure the next time through that we don't end up here again.
-						c = '\0';
-
-						AddFieldToRecord( ref recordPosition, field );
-
-						return record;
-					}
-
-					return null;
+					return record;
 				}
-
-				readerBufferPosition++;
-				CharPosition++;
 
 				if( c == configuration.Quote )
 				{
@@ -409,22 +352,22 @@ namespace CsvHelper
 				}
 				else if( c == '\r' || c == '\n' )
 				{
-					//if( cPrev == '\r' && c == '\n' )
-					//{
-					//	// We are still on the same line.
+					var fieldLength = readerBufferPosition - fieldStartPosition - 1;
 
-					//	UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-
-					//	fieldStartPosition = readerBufferPosition;
-					//	continue;
-					//}
-
-					var appendFieldLength = readerBufferPosition - fieldStartPosition - 1;
-
-					if( c == '\r' && PeekChar() == '\n' )
+					if( c == '\r' )
 					{
-						readerBufferPosition++;
-						CharPosition++;
+						var nextChar = PeekChar( ref fieldStartPosition, ref field, fieldLength );
+						if( nextChar == '\0' )
+						{
+							AddFieldToRecord( ref recordPosition, field );
+							break;
+						}
+
+						if( nextChar == '\n' )
+						{
+							readerBufferPosition++;
+							CharPosition++;
+						}
 					}
 
 					if( cPrev == '\0' || cPrev == '\r' || cPrev == '\n' || inComment )
@@ -441,7 +384,7 @@ namespace CsvHelper
 
 					// If we hit the end of the record, add 
 					// the current field and return the record.
-					AppendField( ref field, fieldStartPosition, appendFieldLength );
+					AppendField( ref field, fieldStartPosition, fieldLength );
 					// Include the \r or \n in the byte count.
 					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
 					AddFieldToRecord( ref recordPosition, field );
@@ -456,66 +399,73 @@ namespace CsvHelper
 			return record;
 		}
 
-		private char GetChar( ref int fieldStartPosition, ref string field )
+		private char GetChar( ref int fieldStartPosition, ref string field, ref int recordPosition )
 		{
 			if( readerBufferPosition == charsRead )
 			{
-				// We need to read more of the stream.
-
-				if( fieldStartPosition != readerBufferPosition )
+				if( !RefreshBuffer( ref fieldStartPosition, ref field, readerBufferPosition - fieldStartPosition ) )
 				{
-					// The buffer ran out. Take the current
-					// text and add it to the field.
-					AppendField( ref field, fieldStartPosition, readerBufferPosition - fieldStartPosition );
-					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
-				}
+					if( c != '\r' && c != '\n' && c != '\0' )
+					{
+						//if( prevCharWasDelimeter )
+						//{
+						//	// Handle an empty field at the end of the row.
+						//	field = "";
+						//}
 
-				charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
-				readerBufferPosition = 0;
-				fieldStartPosition = 0;
+						AddFieldToRecord( ref recordPosition, field );
+					}
 
-				if( charsRead == 0 )
-				{
+					doneParsing = true;
 					return '\0';
 				}
+			}
 
-				//if( charsRead == 0 )
-				//{
-				//	// The end of the stream has been reached.
+			var currentChar = readerBuffer[readerBufferPosition];
 
-				//	if( c != '\r' && c != '\n' && c != '\0' )
-				//	{
-				//		if( prevCharWasDelimeter )
-				//		{
-				//			// Handle an empty field at the end of the row.
-				//			field = "";
-				//		}
+			readerBufferPosition++;
+			CharPosition++;
 
-				//		// Make sure the next time through that we don't end up here again.
-				//		c = '\0';
+			return currentChar;
+		}
 
-				//		AddFieldToRecord( ref recordPosition, field );
-
-				//		return record;
-				//	}
-
-				//	return null;
-				//}
+		private char PeekChar( ref int fieldStartPosition, ref string field, int fieldLength )
+		{
+			if( readerBufferPosition == charsRead )
+			{
+				if( !RefreshBuffer( ref fieldStartPosition, ref field, fieldLength ) )
+				{
+					doneParsing = true;
+					return '\0';
+				}
 			}
 
 			return readerBuffer[readerBufferPosition];
 		}
 
-		private char PeekChar()
+		/// <summary>
+		/// Reads more characters from the stream into the buffer.
+		/// Text that is partially read will be added to the field.
+		/// </summary>
+		/// <param name="fieldStartPosition"></param>
+		/// <param name="field"></param>
+		/// <param name="fieldLength"></param>
+		/// <returns>True if the buffer was refreshed, false if we have hit the end of the stream.</returns>
+		private bool RefreshBuffer( ref int fieldStartPosition, ref string field, int fieldLength )
 		{
-			if( readerBufferPosition < charsRead )
+			if( fieldStartPosition != readerBufferPosition )
 			{
-				return readerBuffer[readerBufferPosition];
+				// The buffer ran out. Take the current
+				// text and add it to the field.
+				AppendField( ref field, fieldStartPosition, fieldLength );
+				UpdateBytePosition( fieldStartPosition, fieldLength );
 			}
 
-			//TODO: Advance buffer.
+			charsRead = reader.Read( readerBuffer, 0, readerBuffer.Length );
+			readerBufferPosition = 0;
+			fieldStartPosition = 0;
 
-			return '\0';
+			return charsRead != 0;
 		}
 	}
 }

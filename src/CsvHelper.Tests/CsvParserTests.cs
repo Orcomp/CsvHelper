@@ -402,29 +402,22 @@ namespace CsvHelper.Tests
 			using( var streamWriter = new StreamWriter( memoryStream ) )
 			using( var parser = new CsvParser( streamReader ) )
 			{
-				streamWriter.Write( "one,two\r" );
-				streamWriter.Write( "three,four\r" );
-				streamWriter.Write( "five,six\r" );
+				streamWriter.Write( "1,2\r" );
+				streamWriter.Write( "3,4\r" );
 				streamWriter.Flush();
 				memoryStream.Position = 0;
 
 				var record = parser.Read();
 				Assert.IsNotNull( record );
 				Assert.AreEqual( 2, record.Length );
-				Assert.AreEqual( "one", record[0] );
-				Assert.AreEqual( "two", record[1] );
+				Assert.AreEqual( "1", record[0] );
+				Assert.AreEqual( "2", record[1] );
 
 				record = parser.Read();
 				Assert.IsNotNull( record );
 				Assert.AreEqual( 2, record.Length );
-				Assert.AreEqual( "three", record[0] );
-				Assert.AreEqual( "four", record[1] );
-
-				record = parser.Read();
-				Assert.IsNotNull( record );
-				Assert.AreEqual( 2, record.Length );
-				Assert.AreEqual( "five", record[0] );
-				Assert.AreEqual( "six", record[1] );
+				Assert.AreEqual( "3", record[0] );
+				Assert.AreEqual( "4", record[1] );
 			}
 		}
 
@@ -570,17 +563,14 @@ namespace CsvHelper.Tests
 			parser.Configuration.HasHeaderRecord = false;
 
 			var record = parser.Read();
-
 			Assert.IsNotNull( record );
 			Assert.AreEqual( "", record[2] );
 
 			record = parser.Read();
-
 			Assert.IsNotNull( record );
 			Assert.AreEqual( "", record[2] );
 
 			record = parser.Read();
-
 			Assert.IsNull( record );
 		}
 
