@@ -514,10 +514,11 @@ namespace CsvHelper
 			CheckDisposed();
 			CheckHasBeenRead();
 
-			// DateTimeConverter.ConvertFrom will successfully convert
-			// a white space string to a DateTime.MinValue instead of
+			// DateTimeConverter.ConvertFrom (and TimeSpanConverter.ConvertFrom)
+            // will successfully convert
+			// a white space string to a DateTime.MinValue (or TimeSpan.Zero) instead of
 			// returning null, so we need to handle this special case.
-			if( converter is DateTimeConverter )
+            if (converter is DateTimeConverter || converter is CsvHelper.TypeConversion.TimeSpanConverter)
 			{
 #if NET_2_0
 				if( StringHelper.IsNullOrWhiteSpace( currentRecord[index] ) )

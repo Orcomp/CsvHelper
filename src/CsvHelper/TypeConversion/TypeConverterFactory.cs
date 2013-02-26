@@ -35,6 +35,10 @@ namespace CsvHelper.TypeConversion
 			{
 				return new DateTimeConverter();
 			}
+            if (type == typeof( TimeSpan ) )
+            {
+                return new TimeSpanConverter();
+            }
 			if( type == typeof( decimal ) )
 			{
 				return new DecimalConverter();
