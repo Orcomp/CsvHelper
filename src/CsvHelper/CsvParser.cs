@@ -243,7 +243,8 @@ namespace CsvHelper
 			while( true )
 			{
 				cPrev = c;
-				c = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, readerBufferPosition - fieldStartPosition );
+				var fieldLength = readerBufferPosition - fieldStartPosition;
+				c = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, ref fieldLength );
 				if( c == '\0' )
 				{
 					break;
@@ -354,10 +355,10 @@ namespace CsvHelper
 				}
 				else if( c == '\r' || c == '\n' )
 				{
-					var fieldLength = readerBufferPosition - fieldStartPosition - 1;
+					fieldLength = readerBufferPosition - fieldStartPosition - 1;
 					if( c == '\r' )
 					{
-						var cNext = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, fieldLength, true );
+						var cNext = GetChar( ref fieldStartPosition, ref rawFieldStartPosition, ref field, prevCharWasDelimiter, ref recordPosition, ref fieldLength, true );
 						if( cNext == '\n' )
 						{
 							readerBufferPosition++;
@@ -424,7 +425,7 @@ namespace CsvHelper
 		/// <param name="isPeek">A value indicating if this call is a peek. If true and the end of the record was found
 		/// no record handling will be done.</param>
 		/// <returns>The current character in the buffer.</returns>
-		protected char GetChar( ref int fieldStartPosition, ref int rawFieldStartPosition, ref string field, bool prevCharWasDelimiter, ref int recordPosition, int fieldLength, bool isPeek = false )
+		protected char GetChar( ref int fieldStartPosition, ref int rawFieldStartPosition, ref string field, bool prevCharWasDelimiter, ref int recordPosition, ref int fieldLength, bool isPeek = false )
 		{
 			if( readerBufferPosition == charsRead )
 			{
@@ -436,6 +437,7 @@ namespace CsvHelper
 					// text and add it to the field.
 					AppendField( ref field, fieldStartPosition, fieldLength );
 					UpdateBytePosition( fieldStartPosition, readerBufferPosition - fieldStartPosition );
+					fieldLength = 0;
 
 					RawRecord += new string( readerBuffer, rawFieldStartPosition, readerBufferPosition - rawFieldStartPosition );
 				}
